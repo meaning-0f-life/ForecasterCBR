@@ -1,0 +1,6 @@
+fastapi
+uvicorn[standard]
+ollama
+requests
+python-dotenv
+cachetools
