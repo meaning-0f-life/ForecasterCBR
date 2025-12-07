@@ -1,7 +1,7 @@
 import ollama
 from typing import Dict, Optional
 from app.utils.logger import setup_logger
-from .prompts import ANALYZE_KEY_RATE_PROMPT_RU, RATE_CHANGE_PROMPT_RU, NEXT_MEETING_PREDICTION_PROMPT_RU, GENERAL_QA_PROMPT_RU, COMPREHENSIVE_QA_PROMPT_RU
+from .prompts import ANALYZE_KEY_RATE_PROMPT_RU, RATE_CHANGE_PROMPT_RU, NEXT_MEETING_PREDICTION_PROMPT_RU, GENERAL_QA_PROMPT_RU, COMPREHENSIVE_QA_PROMPT_RU, SYSTEM_QA_PROMPT_RU
 
 logger = setup_logger(__name__)
 
@@ -128,4 +128,24 @@ class LLMAnalyzer:
             return answer
         except Exception as e:
             logger.error(f"Error answering question with full context: {e}")
+            return None
+
+    def answer_with_system_context(self, system_context: str, user_question: str) -> Optional[str]:
+        """Answer user's question using system context (efficient approach)."""
+        try:
+            # Use simple question prompt with system context
+            prompt = SYSTEM_QA_PROMPT_RU.format(
+                system_context=system_context,
+                user_question=user_question
+            )
+
+            response = self.client.chat(
+                model=self.model,
+                messages=[{"role": "user", "content": prompt}]
+            )
+            answer = response["message"]["content"]
+            logger.info("Question answered using system context")
+            return answer
+        except Exception as e:
+            logger.error(f"Error answering with system context: {e}")
             return None

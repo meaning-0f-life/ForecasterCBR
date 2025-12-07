@@ -6,6 +6,7 @@ from app.data.cache import DataCache
 from app.utils.logger import setup_logger
 from app.webhook import router
 from app.telegram_bot import init_telegram_bot, start_telegram_bot
+from app.context_manager import get_context_manager
 import os
 import asyncio
 from contextlib import asynccontextmanager
@@ -19,6 +20,13 @@ async def lifespan(app: FastAPI):
     """Handle startup and shutdown events."""
     # Startup
     logger.info("Starting CBR Analysis System...")
+    try:
+        # Initialize context manager (starts auto-update thread)
+        get_context_manager()
+        logger.info("System context manager initialized successfully")
+    except Exception as e:
+        logger.error(f"Failed to initialize context manager: {e}")
+
     try:
         init_telegram_bot()
         logger.info("Telegram bot initialized successfully")
@@ -46,7 +54,7 @@ fetcher = DataFetcher(
 )
 analyzer = LLMAnalyzer(
     model=os.getenv("OLLAMA_MODEL"),
-    host=os.getenv("OLLAMA_HOST", "http://localhost:11434")
+    host=os.getenv("OLLAMA_HOST")
 )
 
 class AnalysisRequest(BaseModel):

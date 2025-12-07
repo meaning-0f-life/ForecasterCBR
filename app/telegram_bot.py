@@ -6,8 +6,7 @@ from aiogram.filters import Command
 import os
 from dotenv import load_dotenv
 from app.llm.analyzer import LLMAnalyzer
-from app.data.fetcher import DataFetcher
-from app.data.cache import DataCache
+from app.context_manager import get_context_manager
 from app.utils.logger import setup_logger
 
 load_dotenv()
@@ -32,16 +31,11 @@ class TelegramAnalyzerBot:
         self.bot = Bot(token=self.bot_token, default=bot_properties)
         self.dp = Dispatcher()
 
-        # Initialize components same as main app
-        self.cache = DataCache(ttl=int(os.getenv("CACHE_TTL", 3600)))
-        self.fetcher = DataFetcher(
-            news_api_key=os.getenv("NEWS_API_KEY", ""),
-            economic_api_key=os.getenv("ECONOMIC_DATA_API_KEY", ""),
-            cache=self.cache
-        )
+        # Initialize components
+        self.context_manager = get_context_manager()  # System context manager
         self.analyzer = LLMAnalyzer(
-            model=os.getenv("OLLAMA_MODEL", "llama2"),
-            host=os.getenv("OLLAMA_HOST", "http://localhost:11434")
+            model=os.getenv("OLLAMA_MODEL"),
+            host=os.getenv("OLLAMA_HOST")
         )
 
         # Register handlers
@@ -91,22 +85,11 @@ class TelegramAnalyzerBot:
         thinking_msg = await message.reply("🤔 Думаю над вашим вопросом...")
 
         try:
-            # Get comprehensive data for analysis
-            context_data = self.fetcher.get_combined_data()
-            meeting_data = self.fetcher.get_cbr_meeting_dates()
-            historical_rates = self.fetcher._fetch_cbr_key_rates_history()
+            # Get current system context (automatically updated every CACHE_TTL seconds)
+            system_context = self.context_manager.get_context()
 
-            # Prepare comprehensive context
-            comprehensive_data = {
-                "cached_news_and_articles": context_data,
-                "meeting_dates": meeting_data,
-                "historical_key_rates": historical_rates,
-                "current_inflation": self.fetcher._fetch_inflation_history(),
-                "gdp_data": self.fetcher._fetch_gdp_history()
-            }
-
-            # Answer the question with full context
-            answer = self.analyzer.answer_question_with_full_context(user_question, comprehensive_data)
+            # Answer using efficient system context approach
+            answer = self.analyzer.answer_with_system_context(system_context, user_question)
 
             if answer:
                 # Limit message length for Telegram (4096 chars)
