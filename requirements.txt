@@ -4,3 +4,4 @@ ollama
 requests
 python-dotenv
 cachetools
+aiogram>=3.0.0

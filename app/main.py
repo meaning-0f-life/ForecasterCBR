@@ -5,13 +5,36 @@ from app.data.fetcher import DataFetcher
 from app.data.cache import DataCache
 from app.utils.logger import setup_logger
 from app.webhook import router
+from app.telegram_bot import init_telegram_bot, start_telegram_bot
 import os
+import asyncio
+from contextlib import asynccontextmanager
 from dotenv import load_dotenv
 
 load_dotenv()
 logger = setup_logger(__name__)
 
-app = FastAPI(title="CBR Key Rate Analysis MVP")
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Handle startup and shutdown events."""
+    # Startup
+    logger.info("Starting CBR Analysis System...")
+    try:
+        init_telegram_bot()
+        logger.info("Telegram bot initialized successfully")
+    except ValueError as e:
+        logger.warning(f"Telegram bot initialization failed: {e}")
+        logger.warning("FastAPI server will start without Telegram bot functionality")
+        logger.warning("To enable Telegram bot, configure TELEGRAM_BOT_TOKEN in .env")
+    except Exception as e:
+        logger.error(f"Unexpected error initializing Telegram bot: {e}")
+
+    yield
+
+    # Shutdown
+    logger.info("Shutting down CBR Analysis System...")
+
+app = FastAPI(title="CBR Key Rate Analysis MVP", lifespan=lifespan)
 app.include_router(router)
 
 # Initialize components
@@ -22,7 +45,7 @@ fetcher = DataFetcher(
     cache=cache
 )
 analyzer = LLMAnalyzer(
-    model=os.getenv("OLLAMA_MODEL", "llama2"),
+    model=os.getenv("OLLAMA_MODEL"),
     host=os.getenv("OLLAMA_HOST", "http://localhost:11434")
 )
 
