@@ -166,10 +166,19 @@ See `.env` file for required configuration.
 
 ## Testing
 
-Run tests:
+Run pytest tests:
 ```bash
 python -m pytest tests/
 ```
+
+### CBR Data Scraping Test
+
+Test the CBR.ru key rate parsing functionality:
+```bash
+python test_cbr_scraping.py
+```
+
+This will analyze the CBR website structure and provide recommendations for implementing real-time data parsing.
 
 ## License
 

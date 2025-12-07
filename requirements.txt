@@ -5,4 +5,6 @@ requests
 python-dotenv
 cachetools
 aiogram>=3.0.0
-openai>=1.0.0  # For DeepSeek API support
+beautifulsoup4>=4.11.0
+pandas>=1.5.0
+openai>=1.0.0
