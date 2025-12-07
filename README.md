@@ -127,3 +127,50 @@ docker-compose up --build
    USE_DEEPSEEK=true
 
    # API данные DeepSeek
+   DEEPSEEK_API_KEY=your_deepseek_api_key_here
+   DEEPSEEK_BASE_URL=https://api.deepseek.com/v1
+   DEEPSEEK_MODEL=deepseek-chat  # или deepseek-coder
+   ```
+
+### Преимущества DeepSeek:
+
+- **Быстрая работа** - не нужно локальное оборудование
+- **Масштабируемость** - обработка большого числа запросов
+- **Качество ответов** - современная архитектура модели
+- **Автоматическое переключение** - fallback на Ollama если DeepSeek недоступен
+
+### Переключение между провайдерами:
+
+```bash
+# Для локального Ollama
+USE_DEEPSEEK=false
+OLLAMA_MODEL=llama3.2:1b
+
+# Для DeepSeek Cloud
+USE_DEEPSEEK=true
+DEEPSEEK_MODEL=deepseek-chat
+```
+
+## Особенности работы с Telegram ботом
+
+- **Эффективная архитектура**: Системный контекст обновляется автоматически каждые CACHE_TTL секунд (настройка в .env)
+- **Быстрые ответы**: Бот использует предзагруженный контекст, а не получает данные каждый раз
+- **Любые вопросы**: Нет классификации intent'ов - отвечаем на любые вопросы о ЦБ РФ, экономике, ставках
+- **Полный анализ**: Ответы основаны на: новостях, заседаниях ЦБ, истории ставок, инфляции, ВВП
+- **Автоматические обновления**: Контекст обновляется в фоне каждые 3600 секунд (по умолчанию)
+- **Поддержка команд**: /start и /help для помощи пользователям
+
+## Environment Variables
+
+See `.env` file for required configuration.
+
+## Testing
+
+Run tests:
+```bash
+python -m pytest tests/
+```
+
+## License
+
+This is an MVP implementation. Use at your own risk.

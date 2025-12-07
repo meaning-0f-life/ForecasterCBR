@@ -24,4 +24,3 @@ class DataCache:
 
     def clear(self) -> None:
         """Clear all cached data."""
-        self.cache.clear()

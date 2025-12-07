@@ -21,6 +21,28 @@ logger = setup_logger(__name__)
 class LLMAnalyzer:
     def __init__(self, model: str = None, host: str = None):
         # Determine which model provider to use
+        # Priority: OpenRouter > DeepSeek > Ollama
+        use_openrouter_env = os.getenv("USE_OPENROUTER")
+        self.use_openrouter = use_openrouter_env.lower()
+
+        if self.use_openrouter:
+            # Use OpenRouter cloud model ( FREE! )
+            if not OPENAI_AVAILABLE:
+                raise ValueError("OpenRouter support requested but openai library not available")
+
+            api_key = os.getenv("OPENROUTER_API_KEY")
+            if not api_key or api_key == "your_openrouter_api_key_here":
+                logger.warning("OpenRouter API key not set, falling back to Ollama")
+                self.use_openrouter = False
+            else:
+                base_url = os.getenv("OPENROUTER_BASE_URL")
+                self.api_key = api_key
+                self.base_url = base_url
+                self.model = os.getenv("OPENROUTER_MODEL")
+                self.provider = "OpenRouter"
+                logger.info(f"Initialized OpenRouter analyzer with model: {self.model}")
+                return
+
         use_deepseek_env = os.getenv("USE_DEEPSEEK") or "false"
         self.use_deepseek = use_deepseek_env.lower() == "true"
 
@@ -40,6 +62,17 @@ class LLMAnalyzer:
             self.provider = "DeepSeek"
             logger.info(f"Initialized DeepSeek analyzer with model: {self.model}")
         else:
+            # Initialize Ollama as fallback
+            self.client = ollama.Client(host=host or os.getenv("OLLAMA_HOST"))
+            self.model = model or os.getenv("OLLAMA_MODEL")
+            self.provider = "Ollama"
+            logger.info(f"Initialized Ollama analyzer with model: {self.model}")
+
+    def setup_openrouter_if_needed(self):
+        """Initialize OpenRouter client if not already set up"""
+        if self.use_openrouter and not hasattr(self, 'client'):
+            self.client = OpenAI(api_key=self.api_key, base_url=self.base_url)
+        else:
             # Use local Ollama model
             self.client = ollama.Client(host=host or os.getenv("OLLAMA_HOST"))
             self.model = model or os.getenv("OLLAMA_MODEL")
@@ -48,7 +81,18 @@ class LLMAnalyzer:
 
     def _chat_completion(self, messages: list) -> str:
         """Unified method for getting completions from different providers."""
-        if self.use_deepseek:
+        if self.use_openrouter:
+            # Initialize client if needed for OpenRouter
+            if not hasattr(self, 'client') or not self.client:
+                self.setup_openrouter_if_needed()
+            response = self.client.chat.completions.create(
+                model=self.model,
+                messages=messages,
+                max_tokens=2048,
+                temperature=0.7
+            )
+            return response.choices[0].message.content
+        elif self.use_deepseek:
             response = self.client.chat.completions.create(
                 model=self.model,
                 messages=messages,
@@ -57,6 +101,7 @@ class LLMAnalyzer:
             )
             return response.choices[0].message.content
         else:
+            # Ollama fallback
             response = self.client.chat(
                 model=self.model,
                 messages=messages
@@ -133,4 +178,48 @@ class LLMAnalyzer:
             meeting_data = comprehensive_data.get("meeting_dates", {})
             meeting_info = f"Следующее заседание: {meeting_data.get('next', 'Не запланировано')}\n"
             meeting_info += f"Предстоящие: {', '.join(meeting_data.get('upcoming', []))}\n"
-            meeting_info
+            meeting_info += f"Прошлые: {', '.join(meeting_data.get('past', []))}"
+            context_parts.append(f"=== ДАТЫ ЗАСЕДАНИЙ ЦБ РФ ===\n{meeting_info}")
+
+            # Historical key rates
+            historical_rates = comprehensive_data.get("historical_key_rates", "")
+            context_parts.append(f"=== ИСТОРИЯ КЛЮЧЕВЫХ СТАВОК ===\n{historical_rates}")
+
+            # Current inflation
+            inflation_data = comprehensive_data.get("current_inflation", "")
+            context_parts.append(f"=== ТЕКУЩИЕ ДАННЫЕ ПО ИНФЛЯЦИИ ===\n{inflation_data}")
+
+            # GDP data
+            gdp_data = comprehensive_data.get("gdp_data", "")
+            context_parts.append(f"=== ДАННЫЕ ПО ВВП ===\n{gdp_data}")
+
+            # Combine all context
+            full_context = "\n\n".join(context_parts)
+
+            prompt = COMPREHENSIVE_QA_PROMPT_RU.format(
+                user_question=user_question,
+                full_context=full_context
+            )
+
+            answer = self._chat_completion([{"role": "user", "content": prompt}])
+            logger.info("Comprehensive question answered with full context")
+            return answer
+        except Exception as e:
+            logger.error(f"Error answering question with full context: {e}")
+            return None
+
+    def answer_with_system_context(self, system_context: str, user_question: str) -> Optional[str]:
+        """Answer user's question using system context (efficient approach)."""
+        try:
+            # Use simple question prompt with system context
+            prompt = SYSTEM_QA_PROMPT_RU.format(
+                system_context=system_context,
+                user_question=user_question
+            )
+
+            answer = self._chat_completion([{"role": "user", "content": prompt}])
+            logger.info("Question answered using system context")
+            return answer
+        except Exception as e:
+            logger.error(f"Error answering with system context: {e}")
+            return None
