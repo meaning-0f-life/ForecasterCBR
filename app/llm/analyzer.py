@@ -21,7 +21,8 @@ logger = setup_logger(__name__)
 class LLMAnalyzer:
     def __init__(self, model: str = None, host: str = None):
         # Determine which model provider to use
-        self.use_deepseek = os.getenv("USE_DEEPSEEK").lower() == "true"
+        use_deepseek_env = os.getenv("USE_DEEPSEEK") or "false"
+        self.use_deepseek = use_deepseek_env.lower() == "true"
 
         if self.use_deepseek:
             # Use DeepSeek cloud model
@@ -132,48 +133,4 @@ class LLMAnalyzer:
             meeting_data = comprehensive_data.get("meeting_dates", {})
             meeting_info = f"Следующее заседание: {meeting_data.get('next', 'Не запланировано')}\n"
             meeting_info += f"Предстоящие: {', '.join(meeting_data.get('upcoming', []))}\n"
-            meeting_info += f"Прошлые: {', '.join(meeting_data.get('past', []))}"
-            context_parts.append(f"=== ДАТЫ ЗАСЕДАНИЙ ЦБ РФ ===\n{meeting_info}")
-
-            # Historical key rates
-            historical_rates = comprehensive_data.get("historical_key_rates", "")
-            context_parts.append(f"=== ИСТОРИЯ КЛЮЧЕВЫХ СТАВОК ===\n{historical_rates}")
-
-            # Current inflation
-            inflation_data = comprehensive_data.get("current_inflation", "")
-            context_parts.append(f"=== ТЕКУЩИЕ ДАННЫЕ ПО ИНФЛЯЦИИ ===\n{inflation_data}")
-
-            # GDP data
-            gdp_data = comprehensive_data.get("gdp_data", "")
-            context_parts.append(f"=== ДАННЫЕ ПО ВВП ===\n{gdp_data}")
-
-            # Combine all context
-            full_context = "\n\n".join(context_parts)
-
-            prompt = COMPREHENSIVE_QA_PROMPT_RU.format(
-                user_question=user_question,
-                full_context=full_context
-            )
-
-            answer = self._chat_completion([{"role": "user", "content": prompt}])
-            logger.info("Comprehensive question answered with full context")
-            return answer
-        except Exception as e:
-            logger.error(f"Error answering question with full context: {e}")
-            return None
-
-    def answer_with_system_context(self, system_context: str, user_question: str) -> Optional[str]:
-        """Answer user's question using system context (efficient approach)."""
-        try:
-            # Use simple question prompt with system context
-            prompt = SYSTEM_QA_PROMPT_RU.format(
-                system_context=system_context,
-                user_question=user_question
-            )
-
-            answer = self._chat_completion([{"role": "user", "content": prompt}])
-            logger.info("Question answered using system context")
-            return answer
-        except Exception as e:
-            logger.error(f"Error answering with system context: {e}")
-            return None
+            meeting_info

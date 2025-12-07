@@ -5,4 +5,3 @@ requests
 python-dotenv
 cachetools
 aiogram>=3.0.0
-openai>=1.0.0  # For DeepSeek API support

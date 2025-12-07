@@ -100,17 +100,4 @@ COMPREHENSIVE_QA_PROMPT_RU = """
 """
 
 SYSTEM_QA_PROMPT_RU = """
-Ты - ведущий финансовый аналитик и эксперт по монетарной политике Центрального банка России.
-
-{system_context}
-
-Используй эту информацию для ответа на вопрос пользователя. Отвечай обоснованно, точно и на русском языке.
-
-Вопрос пользователя: {user_question}
-
-Ответ:
-"""
-
-# English versions for compatibility
-ANALYZE_KEY_RATE_PROMPT = ANALYZE_KEY_RATE_PROMPT_RU
-RATE_CHANGE_PROMPT = RATE_CHANGE_PROMPT_RU
+Ты - ведущий финансовый аналитик и экс
