@@ -1,14 +1,66 @@
 import ollama
 from typing import Dict, Optional
+import os
+from dotenv import load_dotenv
+
+# Optional DeepSeek support
+try:
+    from openai import OpenAI
+    OPENAI_AVAILABLE = True
+except ImportError:
+    OPENAI_AVAILABLE = False
+    print("Warning: openai library not available. DeepSeek support disabled.")
+
 from app.utils.logger import setup_logger
 from .prompts import ANALYZE_KEY_RATE_PROMPT_RU, RATE_CHANGE_PROMPT_RU, NEXT_MEETING_PREDICTION_PROMPT_RU, GENERAL_QA_PROMPT_RU, COMPREHENSIVE_QA_PROMPT_RU, SYSTEM_QA_PROMPT_RU
+
+load_dotenv()
 
 logger = setup_logger(__name__)
 
 class LLMAnalyzer:
-    def __init__(self, model: str = "llama2", host: str = "http://localhost:11434"):
-        self.model = model
-        self.client = ollama.Client(host=host)
+    def __init__(self, model: str = None, host: str = None):
+        # Determine which model provider to use
+        self.use_deepseek = os.getenv("USE_DEEPSEEK").lower() == "true"
+
+        if self.use_deepseek:
+            # Use DeepSeek cloud model
+            if not OPENAI_AVAILABLE:
+                raise ValueError("DeepSeek support requested but openai library not available")
+
+            api_key = os.getenv("DEEPSEEK_API_KEY")
+            base_url = os.getenv("DEEPSEEK_BASE_URL")
+
+            if not api_key:
+                raise ValueError("DEEPSEEK_API_KEY not set in environment")
+
+            self.client = OpenAI(api_key=api_key, base_url=base_url)
+            self.model = os.getenv("DEEPSEEK_MODEL")
+            self.provider = "DeepSeek"
+            logger.info(f"Initialized DeepSeek analyzer with model: {self.model}")
+        else:
+            # Use local Ollama model
+            self.client = ollama.Client(host=host or os.getenv("OLLAMA_HOST"))
+            self.model = model or os.getenv("OLLAMA_MODEL")
+            self.provider = "Ollama"
+            logger.info(f"Initialized Ollama analyzer with model: {self.model}")
+
+    def _chat_completion(self, messages: list) -> str:
+        """Unified method for getting completions from different providers."""
+        if self.use_deepseek:
+            response = self.client.chat.completions.create(
+                model=self.model,
+                messages=messages,
+                max_tokens=2048,
+                temperature=0.7
+            )
+            return response.choices[0].message.content
+        else:
+            response = self.client.chat(
+                model=self.model,
+                messages=messages
+            )
+            return response["message"]["content"]
 
     def analyze_key_rate(self, data_text: str, news_data: str = "", economic_data: str = "") -> Optional[str]:
         """Analyze the key interest rate using LLM (Russian)."""
@@ -18,11 +70,7 @@ class LLMAnalyzer:
                 economic_data=economic_data,
                 data_text=data_text
             )
-            response = self.client.chat(
-                model=self.model,
-                messages=[{"role": "user", "content": prompt}]
-            )
-            analysis = response["message"]["content"]
+            analysis = self._chat_completion([{"role": "user", "content": prompt}])
             logger.info("Key rate analysis completed")
             return analysis
         except Exception as e:
@@ -33,11 +81,7 @@ class LLMAnalyzer:
         """Predict if the rate will increase, decrease, or stay the same (Russian)."""
         try:
             prompt = RATE_CHANGE_PROMPT_RU.format(data_text=data_text)
-            response = self.client.chat(
-                model=self.model,
-                messages=[{"role": "user", "content": prompt}]
-            )
-            prediction = response["message"]["content"]
+            prediction = self._chat_completion([{"role": "user", "content": prompt}])
             logger.info("Rate change prediction completed")
             return prediction
         except Exception as e:
@@ -53,11 +97,7 @@ class LLMAnalyzer:
                 historical_decisions=historical_decisions,
                 data_text=data_text
             )
-            response = self.client.chat(
-                model=self.model,
-                messages=[{"role": "user", "content": prompt}]
-            )
-            prediction = response["message"]["content"]
+            prediction = self._chat_completion([{"role": "user", "content": prompt}])
             logger.info("Next meeting rate prediction completed")
             return prediction
         except Exception as e:
@@ -71,11 +111,7 @@ class LLMAnalyzer:
                 user_question=user_question,
                 context_data=context_data
             )
-            response = self.client.chat(
-                model=self.model,
-                messages=[{"role": "user", "content": prompt}]
-            )
-            answer = response["message"]["content"]
+            answer = self._chat_completion([{"role": "user", "content": prompt}])
             logger.info("General question answered")
             return answer
         except Exception as e:
@@ -119,11 +155,7 @@ class LLMAnalyzer:
                 full_context=full_context
             )
 
-            response = self.client.chat(
-                model=self.model,
-                messages=[{"role": "user", "content": prompt}]
-            )
-            answer = response["message"]["content"]
+            answer = self._chat_completion([{"role": "user", "content": prompt}])
             logger.info("Comprehensive question answered with full context")
             return answer
         except Exception as e:
@@ -139,11 +171,7 @@ class LLMAnalyzer:
                 user_question=user_question
             )
 
-            response = self.client.chat(
-                model=self.model,
-                messages=[{"role": "user", "content": prompt}]
-            )
-            answer = response["message"]["content"]
+            answer = self._chat_completion([{"role": "user", "content": prompt}])
             logger.info("Question answered using system context")
             return answer
         except Exception as e:

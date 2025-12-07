@@ -51,10 +51,13 @@ cbr-mvp-system/
    pip install -r requirements.txt
    ```
 
-3. Set up environment variables in `.env`:
-   - Configure your API keys for news and economic data
-   - Set Ollama host and model
-   - Set Telegram bot token (получите у @BotFather в Telegram)
+3. Configure environment variables:
+   - Copy `.env.example` to `.env`: `cp .env.example .env`
+   - Edit `.env` file and add your API keys and tokens:
+     - Get News API key from [newsapi.org](https://newsapi.org)
+     - Get Alpha Vantage API key from [alphavantage.co](https://www.alphavantage.co)
+     - Create Telegram bot and get token from [@BotFather](https://t.me/BotFather)
+     - Optionally configure DeepSeek API key
 
 4. Ensure Ollama is running locally with the specified model:
    ```bash
@@ -110,10 +113,64 @@ docker-compose up --build
 - Система автоматически включит их в анализ
 - Подробности см. в articles/README.md
 
+## DeepSeek Cloud Model Support
+
+Система теперь поддерживает как локальные модели Ollama, так и облачные модели DeepSeek!
+
+### Настройка DeepSeek:
+
+1. **Зарегистрируйтесь** на [platform.deepseek.com](https://platform.deepseek.com)
+2. **Получите API ключ** в личном кабинете
+3. **Настройте переменные в .env**:
+   ```bash
+   # Включить DeepSeek вместо Ollama
+   USE_DEEPSEEK=true
+
+   # API данные DeepSeek
+   DEEPSEEK_API_KEY=your_deepseek_api_key_here
+   DEEPSEEK_BASE_URL=https://api.deepseek.com/v1
+   DEEPSEEK_MODEL=deepseek-chat  # или deepseek-coder
+   ```
+
+### Преимущества DeepSeek:
+
+- **Быстрая работа** - не нужно локальное оборудование
+- **Масштабируемость** - обработка большого числа запросов
+- **Качество ответов** - современная архитектура модели
+- **Автоматическое переключение** - fallback на Ollama если DeepSeek недоступен
+
+### Переключение между провайдерами:
+
+```bash
+# Для локального Ollama
+USE_DEEPSEEK=false
+OLLAMA_MODEL=llama3.2:1b
+
+# Для DeepSeek Cloud
+USE_DEEPSEEK=true
+DEEPSEEK_MODEL=deepseek-chat
+```
+
 ## Особенности работы с Telegram ботом
 
 - **Эффективная архитектура**: Системный контекст обновляется автоматически каждые CACHE_TTL секунд (настройка в .env)
 - **Быстрые ответы**: Бот использует предзагруженный контекст, а не получает данные каждый раз
 - **Любые вопросы**: Нет классификации intent'ов - отвечаем на любые вопросы о ЦБ РФ, экономике, ставках
 - **Полный анализ**: Ответы основаны на: новостях, заседаниях ЦБ, истории ставок, инфляции, ВВП
-- *
+- **Автоматические обновления**: Контекст обновляется в фоне каждые 3600 секунд (по умолчанию)
+- **Поддержка команд**: /start и /help для помощи пользователям
+
+## Environment Variables
+
+See `.env` file for required configuration.
+
+## Testing
+
+Run tests:
+```bash
+python -m pytest tests/
+```
+
+## License
+
+This is an MVP implementation. Use at your own risk.
