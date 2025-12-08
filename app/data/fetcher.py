@@ -220,26 +220,35 @@ class DataFetcher:
             # Pair dates with rates
             paired_data = list(zip(dates_list, rates_float))
 
+            # Filter to only include dates where rate changed (remove consecutive same rates)
+            changes_data = []
+            prev_rate = None
+            for date, rate in paired_data:
+                if prev_rate is None or rate != prev_rate:
+                    changes_data.append((date, rate))
+                    prev_rate = rate
+
             # Format the data
             history_text = "КЛЮЧЕВЫЕ СТАВКИ ЦБ РФ (из интерактивного графика на cbr.ru):\n\n"
 
             # Add current rate (most recent)
-            if paired_data:
-                current_date, current_rate = paired_data[-1]
+            if changes_data:
+                current_date, current_rate = changes_data[-1]
                 history_text += f"ТЕКУЩАЯ СТАВКА: {current_rate:.2f}% ({current_date})"
-                history_text += "\n\nПОЛНАЯ ИСТОРИЯ (последние 50 изменений):\n"
-                for date, rate in paired_data[-50:]:
+                history_text += "\n\nИСТОРИЯ ИЗМЕНЕНИЙ КЛЮЧЕВОЙ СТАВКИ (только даты изменения):\n"
+                for date, rate in changes_data:
                     history_text += f"- {date}: {rate:.2f}%\n"
             else:
-                logger.warning("No paired data available, using fallback")
+                logger.warning("No changes data available, using fallback")
                 return self._get_fallback_key_rates_data()
 
             history_text += "Источник: Банк России - интерактивный график ключевых ставок\n"
             history_text += f"Всего записей: {len(paired_data)}\n"
+            history_text += f"Записей с изменениями ставки: {len(changes_data)}\n"
             history_text += "Обновлено: " + datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
             self.cache.set(cache_key, history_text)
-            logger.info(f"Successfully parsed {len(paired_data)} key rate records from CBR chart")
+            logger.info(f"Successfully parsed {len(paired_data)} key rate records from CBR chart (filtered to {len(changes_data)} change dates)")
             return history_text
 
         except Exception as e:
@@ -315,10 +324,10 @@ class DataFetcher:
         # CBR usually meets every ~1.5 months, adjust dates as per schedule
         # In real app, implement web scraping from cbr.ru or API if available
         past_dates = [
-            "2024-02-23", "2024-01-26", "2023-12-15", "2023-11-10", "2023-09-15"
+            "2025-11-06", "2025-10-24", "2025-09-24", "2025-09-12", "2025-08-06"
         ]
         upcoming_dates = [
-            "2024-04-26", "2024-06-14", "2024-07-26", "2024-10-11", "2024-11-15"
+            "2025-12-19", "2025-12-29", "2026-01-13", "2026-01-26", "2026-02-20"
         ]
         return {
             "past": past_dates,

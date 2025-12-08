@@ -63,6 +63,10 @@ class SystemContextManager:
             # Форматируем системный контекст
             context_parts = []
 
+            # Текущая дата и время
+            current_datetime_info = f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')} (МСК, UTC+3)"
+            context_parts.append(f"=== ТЕКУЩАЯ ДАТА И ВРЕМЯ ===\n{current_datetime_info}")
+
             # Новости и статьи
             context_parts.append(f"=== НОВОСТИ И СТАТЬИ ===\n{news_articles}")
 

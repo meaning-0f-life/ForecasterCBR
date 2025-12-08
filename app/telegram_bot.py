@@ -25,10 +25,8 @@ class TelegramAnalyzerBot:
         if not self.bot_token.startswith(tuple("0123456789")) or ":" not in self.bot_token:
             raise ValueError("Invalid bot token format. Get a valid token from @BotFather")
 
-        # Initialize bot properties
-        bot_properties = DefaultBotProperties(parse_mode=ParseMode.HTML)
-
-        self.bot = Bot(token=self.bot_token, default=bot_properties)
+        # Initialize bot properties (no parse mode to avoid HTML parsing issues)
+        self.bot = Bot(token=self.bot_token)
         self.dp = Dispatcher()
 
         # Initialize components
@@ -46,7 +44,7 @@ class TelegramAnalyzerBot:
     async def handle_start_command(self, message: types.Message):
         """Handle /start command."""
         welcome_text = (
-            "🤖 <b>CBR Анализатор</b>\n\n"
+            "🤖 **CBR Анализатор**\n\n"
             "Я эксперт по монетарной политике Центрального банка России. "
             "Задайте мне любой вопрос о ключевой ставке ЦБ РФ, экономике, инфляции, "
             "прогнозах и других связанных темах.\n\n"
@@ -59,19 +57,19 @@ class TelegramAnalyzerBot:
             "• Какой прогноз по ставке?\n\n"
             "Просто напишите ваш вопрос! 💬"
         )
-        await message.reply(welcome_text)
+        await message.reply(welcome_text, parse_mode=ParseMode.MARKDOWN)
 
     async def handle_help_command(self, message: types.Message):
         """Handle /help command."""
         welcome_text = (
-            "❓ <b>Помощь</b>\n\n"
+            "❓ **Помощь**\n\n"
             "Я анализирую новости, экономические данные и научные статьи "
             "о монетарной политике ЦБ РФ.\n\n"
             "Задайте вопрос любым текстом - не нужно использовать специальные команды. "
             "Я пойму контекст и дам обоснованный ответ.\n\n"
-            "Пример: <code>Расскажи о текущей ситуации с ключевой ставкой</code>"
+            "Пример: `Расскажи о текущей ситуации с ключевой ставкой`"
         )
-        await message.reply(welcome_text)
+        await message.reply(welcome_text, parse_mode=ParseMode.MARKDOWN)
 
     async def handle_text_message(self, message: types.Message):
         """Handle general text messages (questions)."""
