@@ -157,6 +157,8 @@ class LLMAnalyzer:
                 user_question=user_question,
                 context_data=context_data
             )
+            # Save prompt to file if enabled
+            self._save_prompt_if_enabled(prompt, "general_qa")
             answer = self._chat_completion([{"role": "user", "content": prompt}])
             logger.info("General question answered")
             return answer
@@ -217,9 +219,44 @@ class LLMAnalyzer:
                 user_question=user_question
             )
 
+            # Save prompt to file if enabled
+            self._save_prompt_if_enabled(prompt, "system_context")
+
             answer = self._chat_completion([{"role": "user", "content": prompt}])
             logger.info("Question answered using system context")
             return answer
         except Exception as e:
             logger.error(f"Error answering with system context: {e}")
             return None
+
+    def _save_prompt_if_enabled(self, prompt: str, prompt_type: str = "unknown"):
+        """Save prompt to file if SAVE_PROMPTS environment variable is set."""
+        import os
+        from datetime import datetime
+
+        save_prompts = os.getenv("SAVE_PROMPTS")
+        if not save_prompts:
+            return
+
+        try:
+            # Create prompts directory if it doesn't exist
+            prompts_dir = os.path.join(os.path.dirname(__file__), "../../prompts")
+            os.makedirs(prompts_dir, exist_ok=True)
+
+            # Generate filename with timestamp
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            filename = f"prompt_{prompt_type}_{timestamp}.txt"
+            filepath = os.path.join(prompts_dir, filename)
+
+            # Write prompt to file
+            with open(filepath, 'w', encoding='utf-8') as f:
+                f.write(f"Prompt Type: {prompt_type}\n")
+                f.write(f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+                f.write("=" * 80 + "\n")
+                f.write(prompt)
+                f.write("\n" + "=" * 80 + "\n")
+
+            logger.info(f"Prompt saved to {filepath}")
+
+        except Exception as e:
+            logger.warning(f"Failed to save prompt: {e}")

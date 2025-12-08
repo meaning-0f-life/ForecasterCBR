@@ -55,10 +55,6 @@ class SystemContextManager:
         try:
             # Получаем все данные
             news_articles = self.fetcher.get_combined_data()
-            meeting_data = self.fetcher.get_cbr_meeting_dates()
-            historical_rates = self.fetcher._fetch_cbr_key_rates_history()
-            inflation_data = self.fetcher._fetch_inflation_history()
-            gdp_data = self.fetcher._fetch_gdp_history()
 
             # Форматируем системный контекст
             context_parts = []
@@ -67,23 +63,8 @@ class SystemContextManager:
             current_datetime_info = f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')} (МСК, UTC+3)"
             context_parts.append(f"=== ТЕКУЩАЯ ДАТА И ВРЕМЯ ===\n{current_datetime_info}")
 
-            # Новости и статьи
-            context_parts.append(f"=== НОВОСТИ И СТАТЬИ ===\n{news_articles}")
-
-            # Даты заседаний
-            meeting_info = f"Следующее заседание: {meeting_data.get('next', 'Не запланировано')}\n"
-            meeting_info += f"Предстоящие заседания: {', '.join(meeting_data.get('upcoming', []))}\n"
-            meeting_info += f"Прошлые заседания: {', '.join(meeting_data.get('past', []))}"
-            context_parts.append(f"=== ДАТЫ ЗАСЕДАНИЙ ЦБ РФ ===\n{meeting_info}")
-
-            # Исторические ставки
-            context_parts.append(f"=== ИСТОРИЯ КЛЮЧЕВЫХ СТАВОК ===\n{historical_rates}")
-
-            # Инфляция
-            context_parts.append(f"=== ДАННЫЕ ПО ИНФЛЯЦИИ ===\n{inflation_data}")
-
-            # ВВП
-            context_parts.append(f"=== ДАННЫЕ ПО ВВП ===\n{gdp_data}")
+            # Новости и статьи (уже содержит экономические данные)
+            context_parts.append(f"=== НОВОСТИ И ЭКОНОМИЧЕСКИЕ ДАННЫЕ ===\n{news_articles}")
 
             # Обновляем контекст
             self.system_context = "\n\n".join(context_parts)

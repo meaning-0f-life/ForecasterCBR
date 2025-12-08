@@ -61,3 +61,6 @@ articles/sample_*.txt
 # Logs
 *.log
 logs/
+
+# Prompts (debug feature)
+prompts/
