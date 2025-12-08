@@ -30,42 +30,91 @@ class DataFetcher:
         # Scientific articles folder
         self.articles_folder = os.path.join(os.path.dirname(__file__), "../../articles")
 
-    def fetch_news_data(self, keywords: str = "ЦБ РФ ключевая ставка инфляция экономика") -> Optional[str]:
-        """Fetch latest news data related to CBR and Russian economy."""
-        cache_key = {"type": "news", "keywords": keywords}
+    def fetch_news_data(self, keywords: str = "Россия РФ экономика политика") -> Optional[str]:
+        """Fetch extensive Russia-related news with fallback strategies."""
+        cache_key = {"type": "russia_news_extensive", "keywords": keywords}
         cached_data = self.cache.get(cache_key)
         if cached_data:
-            logger.info("Using cached news data")
+            logger.info("Using cached extensive Russia news data")
             return cached_data
 
-        try:
-            # Get news from last 7 days
-            from_date = (datetime.now() - timedelta(days=7)).strftime("%Y-%m-%d")
+        # Try different approaches to get maximum news data
+        strategies = [
+            {"name": "recent_5years", "days": 5*365, "page_size": 100},  # Full 5 years (may fail)
+            {"name": "recent_1year", "days": 365, "page_size": 100},      # 1 year (may still fail)
+            {"name": "recent_30days", "days": 30, "page_size": 100},     # 30 days (should work)
+            {"name": "recent_7days", "days": 7, "page_size": 100},       # 7 days (fallback)
+        ]
 
-            params = {
-                "q": keywords,
-                "apiKey": self.news_api_key,
-                "language": "ru",
-                "sortBy": "publishedAt",
-                "from": from_date
-            }
-            response = requests.get(self.news_api_url, params=params)
-            response.raise_for_status()
-            data = response.json()
+        news_text = ""
+        articles_found = 0
 
-            # Extract relevant articles
-            articles = data.get("articles", [])[:15]  # More articles for better context
-            news_text = ""
-            for art in articles:
-                if art['description']:
-                    news_text += f"- {art['publishedAt'][:10]} {art['title']}: {art['description']}\n"
+        for strategy in strategies:
+            try:
+                from_date = (datetime.now() - timedelta(days=strategy["days"])).strftime("%Y-%m-%d")
 
-            self.cache.set(cache_key, news_text)
-            logger.info("Fetched and cached news data")
-            return news_text
-        except Exception as e:
-            logger.error(f"Error fetching news data: {e}")
-            return None
+                params = {
+                    "q": keywords,
+                    "apiKey": self.news_api_key,
+                    "language": "ru",
+                    "sortBy": "publishedAt",
+                    "from": from_date,
+                    "pageSize": strategy["page_size"]
+                }
+
+                logger.info(f"Trying strategy: {strategy['name']} (from {from_date})")
+
+                response = requests.get(self.news_api_url, params=params, timeout=15)
+
+                # Handle different error codes
+                if response.status_code == 426:
+                    logger.warning(f"NewsAPI upgrade required for {strategy['name']} strategy")
+                    continue
+                elif response.status_code == 429:
+                    logger.warning(f"NewsAPI rate limit exceeded for {strategy['name']}")
+                    continue
+                else:
+                    response.raise_for_status()
+
+                data = response.json()
+                articles = data.get("articles", [])
+
+                # Add new articles to existing news_text
+                for art in articles:
+                    if art.get('description') and art.get('title'):
+                        article_line = f"- {art['publishedAt'][:10]} {art['title']}: {art['description']}\n"
+                        if article_line not in news_text:  # Avoid duplicates
+                            news_text += article_line
+                            articles_found += 1
+
+                logger.info(f"Strategy {strategy['name']}: got {len(articles)} articles")
+
+                # If we found articles, continue with next strategy to get more
+                if len(articles) > 0:
+                    continue
+
+            except Exception as e:
+                logger.warning(f"Strategy {strategy['name']} failed: {e}")
+                continue
+
+        # If no news was found, provide informative message
+        if not news_text:
+            news_text = """NewsAPI ограничивает доступ к историческим данным.
+Для получения новостей России за 5 лет нужны:
+• Премиум аккаунт NewsAPI
+• Или альтернативный новостной API (Mediapress, NewsCred и др.)
+
+Текущая сборка использует доступные данные за последние дни."""
+
+        result = f"НОВОСТИ ПО РОССИИ (все доступные новости за период):\n\n{news_text}\n"
+        result += f"Всего получено статей: {articles_found}\n"
+        result += f"Источник: NewsAPI с расширенным поиском\n"
+        result += f"Обновлено: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+
+        self.cache.set(cache_key, result)
+        logger.info(f"Compiled {articles_found} Russia news articles across strategies")
+
+        return result
 
     def fetch_historical_economic_data(self) -> Optional[str]:
         """Fetch historical economic data from CBR and other sources."""
