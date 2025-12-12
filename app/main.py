@@ -1,146 +1,21 @@
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
-from app.llm.analyzer import LLMAnalyzer
-from app.data.fetcher import DataFetcher
-from app.data.cache import DataCache
 from app.utils.logger import setup_logger
 from app.webhook import router
-from app.telegram_bot import init_telegram_bot, start_telegram_bot
-from app.context_manager import get_context_manager
 import os
-import asyncio
-from contextlib import asynccontextmanager
 from dotenv import load_dotenv
 
 load_dotenv()
 logger = setup_logger(__name__)
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    """Handle startup and shutdown events."""
-    # Startup
-    logger.info("Starting CBR Analysis System...")
-    try:
-        # Initialize context manager (starts auto-update thread)
-        get_context_manager()
-        logger.info("System context manager initialized successfully")
-    except Exception as e:
-        logger.error(f"Failed to initialize context manager: {e}")
-
-    try:
-        init_telegram_bot()
-        logger.info("Telegram bot initialized successfully")
-    except ValueError as e:
-        logger.warning(f"Telegram bot initialization failed: {e}")
-        logger.warning("FastAPI server will start without Telegram bot functionality")
-        logger.warning("To enable Telegram bot, configure TELEGRAM_BOT_TOKEN in .env")
-    except Exception as e:
-        logger.error(f"Unexpected error initializing Telegram bot: {e}")
-
-    yield
-
-    # Shutdown
-    logger.info("Shutting down CBR Analysis System...")
-
-app = FastAPI(title="CBR Key Rate Analysis MVP", lifespan=lifespan)
+app = FastAPI(title="CBR Key Rate Analysis MVP")
 app.include_router(router)
 
-# Initialize components
-cache = DataCache(ttl=int(os.getenv("CACHE_TTL", 3600)))
-fetcher = DataFetcher(
-    news_api_key=os.getenv("NEWS_API_KEY", ""),
-    economic_api_key=os.getenv("ECONOMIC_DATA_API_KEY", ""),
-    cache=cache
-)
-analyzer = LLMAnalyzer(
-    model=os.getenv("OLLAMA_MODEL"),
-    host=os.getenv("OLLAMA_HOST")
-)
 
-class AnalysisRequest(BaseModel):
-    custom_data: str = ""
 
 @app.get("/")
 def read_root():
-    return {"message": "CBR Analysis System MVP", "version": "1.0.0"}
-
-@app.post("/analyze")
-def analyze_key_rate(request: AnalysisRequest):
-    """Analyze the current CBR key rate."""
-    try:
-        data = request.custom_data or fetcher.get_combined_data()
-        analysis = analyzer.analyze_key_rate(data_text=data)
-        if not analysis:
-            raise HTTPException(status_code=500, detail="Analysis failed")
-        return {"analysis": analysis}
-    except Exception as e:
-        logger.error(f"Error in analyze endpoint: {e}")
-        raise HTTPException(status_code=500, detail="Internal server error")
-
-@app.post("/predict-change")
-def predict_rate_change(request: AnalysisRequest):
-    """Predict future rate changes (Russian)."""
-    try:
-        data = request.custom_data or fetcher.get_combined_data()
-        prediction = analyzer.predict_rate_change(data_text=data)
-        if not prediction:
-            raise HTTPException(status_code=500, detail="Prediction failed")
-        return {"prediction": prediction}
-    except Exception as e:
-        logger.error(f"Error in predict-change endpoint: {e}")
-        raise HTTPException(status_code=500, detail="Internal server error")
-
-@app.post("/predict-next-meeting")
-def predict_next_meeting_rate(request: AnalysisRequest):
-    """Predict key rate after next CBR meeting."""
-    try:
-        data = request.custom_data or fetcher.get_combined_data()
-        meeting_data = fetcher.get_cbr_meeting_dates()
-
-        next_date = meeting_data["next"]
-        upcoming = meeting_data["upcoming"]
-        past_rates = fetcher._fetch_cbr_key_rates_history()  # Get historical rates
-
-        if not next_date:
-            return {"error": "Нет запланированных заседаний ЦБ РФ"}
-
-        prediction = analyzer.predict_next_meeting_rate(
-            data_text=data,
-            next_meeting_date=next_date,
-            upcoming_dates=upcoming,
-            historical_decisions=past_rates
-        )
-        if not prediction:
-            raise HTTPException(status_code=500, detail="Next meeting prediction failed")
-
-        return {
-            "next_meeting_date": next_date,
-            "prediction": prediction,
-            "upcoming_dates": upcoming
-        }
-    except Exception as e:
-        logger.error(f"Error in predict-next-meeting endpoint: {e}")
-        raise HTTPException(status_code=500, detail="Prediction error")
-
-@app.get("/meeting-dates")
-def get_meeting_dates():
-    """Get CBR meeting schedule."""
-    try:
-        dates = fetcher.get_cbr_meeting_dates()
-        return dates
-    except Exception as e:
-        logger.error(f"Error fetching meeting dates: {e}")
-        raise HTTPException(status_code=500, detail="Meeting dates fetch error")
-
-@app.get("/data")
-def get_data():
-    """Get current data sources."""
-    try:
-        data = fetcher.get_combined_data()
-        return {"data": data}
-    except Exception as e:
-        logger.error(f"Error fetching data: {e}")
-        raise HTTPException(status_code=500, detail="Data fetch error")
+    return {"message": "CBR Analysis System MVP", "version": "1.0.0", "status": "running"}
 
 if __name__ == "__main__":
     import uvicorn

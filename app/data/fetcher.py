@@ -11,14 +11,23 @@ from .cache import DataCache
 
 # Для парсинга данных ЦБ РФ
 import urllib.parse
+# Для получения данных из Telegram
+try:
+    from telethon.sync import TelegramClient
+    from telethon.tl.types import Message
+except ImportError:
+    TelegramClient = None
+    Message = None
 
 logger = setup_logger(__name__)
 
 class DataFetcher:
-    def __init__(self, news_api_key: str, economic_api_key: str, cache: DataCache):
+    def __init__(self, news_api_key: str, economic_api_key: str, cache: DataCache, telegram_api_id: Optional[int] = None, telegram_api_hash: Optional[str] = None):
         self.news_api_key = news_api_key
         self.economic_api_key = economic_api_key
         self.cache = cache
+        self.telegram_api_id = telegram_api_id
+        self.telegram_api_hash = telegram_api_hash
         self.news_api_url = "https://newsapi.org/v2/everything"
         self.cbr_key_rate_url = "https://www.cbr.ru/currency_base/inflation_report/"  # Placeholder for actual API
         # CBR API endpoints (actual URLs may need adjustment)
@@ -31,19 +40,208 @@ class DataFetcher:
         self.articles_folder = os.path.join(os.path.dirname(__file__), "../../articles")
 
     def fetch_news_data(self, keywords: str = "Россия РФ экономика политика") -> Optional[str]:
-        """Fetch extensive Russia-related news with fallback strategies."""
-        cache_key = {"type": "russia_news_extensive", "keywords": keywords}
+        """Fetch news from CBR Telegram channel @centralbank_russia for the last 2 months."""
+        # First try Telegram approach
+        if TelegramClient and self.telegram_api_id and self.telegram_api_hash:
+            try:
+                return self._fetch_news_from_telegram()
+            except Exception as e:
+                logger.warning(f"Failed to fetch news from Telegram: {e}")
+                # Fallback to NewsAPI if Telegram fails
+
+        # Fallback to NewsAPI
+        return self._fetch_news_from_newsapi(keywords)
+
+    def _fetch_news_from_telegram(self) -> Optional[str]:
+        """Fetch posts from @centralbank_russia Telegram channel for the last 2 months."""
+        cache_key = {"type": "cbr_telegram_news"}
         cached_data = self.cache.get(cache_key)
         if cached_data:
-            logger.info("Using cached extensive Russia news data")
+            logger.info("Using cached Telegram news data")
+            return cached_data
+
+        if not TelegramClient:
+            logger.warning("TelegramClient not available, telethon library missing")
+            return None
+
+        if not self.telegram_api_id or not self.telegram_api_hash:
+            logger.warning("Telegram API credentials not provided")
+            return None
+
+        try:
+            logger.info("Using Telegram API to fetch from @centralbank_russia")
+            import asyncio
+
+            async def fetch_messages():
+                # Use session file specifically for user account with full path
+                session_path = os.path.join(os.path.dirname(__file__), "telegram_user_session")
+
+                try:
+                    # Check if session already exists
+                    if os.path.exists(session_path + '.session'):
+                        logger.info("Found existing session file, connecting...")
+                        client = TelegramClient(session_path, self.telegram_api_id, self.telegram_api_hash)
+                        await client.connect()
+
+                        # Check if authorized
+                        if not await client.is_user_authorized():
+                            logger.warning("Session exists but not authorized")
+                            return []
+
+                        logger.info("Successfully connected to Telegram")
+                    else:
+                        logger.warning("No session file found. Run first time authentication manually.")
+                        logger.info("For now, using fallback news source.")
+                        return []
+
+                    # Calculate date range: last 2 months
+                    two_months_ago = datetime.now() - timedelta(days=60)
+
+                    # Get the channel entity
+                    channel = await client.get_entity("centralbank_russia")
+
+                    # Get messages from the channel starting from 2 months ago
+                    messages = []
+                    count = 0
+                    async for message in client.iter_messages(channel, offset_date=two_months_ago, reverse=True):
+                        if message.text and len(message.text.strip()) > 0 and count < 30:
+                            messages.append(message)
+                            count += 1
+                        if count >= 30:
+                            break
+
+                    logger.info(f"Retrieved {len(messages)} messages from CBR Telegram channel")
+                    return messages
+
+                except Exception as e:
+                    logger.error(f"Error getting messages: {e}")
+                    return []
+
+                finally:
+                    if 'client' in locals():
+                        await client.disconnect()
+
+            # Check if we're in an existing event loop
+            try:
+                asyncio.get_running_loop()
+                logger.info("Already in event loop, skipping Telegram API (use NewsAPI instead)")
+                return None  # Will fallback to NewsAPI
+            except RuntimeError:
+                # No running loop, we can use run()
+                logger.info("No running event loop, can use Telegram API")
+                messages = asyncio.run(fetch_messages())
+
+            if not messages:
+                logger.warning("No messages retrieved from Telegram")
+                return None
+
+            # Process and format messages
+            news_text = ""
+            for msg in messages[:30]:  # Limit to 30 most recent messages
+                # Extract date and clean text
+                msg_date = msg.date.strftime("%d.%m.%Y %H:%M")
+                clean_text = msg.text.strip()[:500]  # Limit text length
+                # Replace newlines with spaces for better formatting
+                clean_text = clean_text.replace('\n', ' ').replace('\r', ' ')
+                # Remove extra spaces
+                clean_text = re.sub(r'\s+', ' ', clean_text)
+
+                if clean_text:
+                    news_text += f"- {msg_date} | {clean_text}\n"
+
+            if not news_text:
+                logger.warning("No valid messages found")
+                return None
+
+            result = f"НОВОСТИ ПО РОССИИ (из Telegram канала ЦБ РФ @centralbank_russia):\n\n{news_text}\n"
+            result += f"Всего получено постов: {len(messages[:30])}\n"
+            result += f"Источник: Telegram канал @centralbank_russia\n"
+            result += f"Период: последние 2 месяца\n"
+            result += f"Обновлено: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+
+            self.cache.set(cache_key, result)
+            logger.info(f"Successfully processed {len(messages[:30])} CB RF Telegram posts")
+
+            return result
+
+        except Exception as e:
+            logger.error(f"Error fetching from CBR Telegram channel: {e}")
+            return None
+
+    def _fetch_cbr_news_alternative(self) -> Optional[str]:
+        """Alternative method to fetch CBR-related news from web sources."""
+        try:
+            logger.info("Fetching CBR news from alternative source")
+
+            # Scrape CBR official website news page
+            url = "https://www.cbr.ru/press/"
+            headers = {
+                'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+            }
+
+            response = requests.get(url, headers=headers, timeout=10)
+            response.raise_for_status()
+
+            soup = BeautifulSoup(response.content, 'html.parser')
+
+            # Find news items on CBR website
+            news_items = []
+
+            # Various selectors for CBR news
+            selectors = [
+                '.news-item',
+                '.press-item',
+                '.news-list-item',
+                'article',
+                '.widget-press_item'
+            ]
+
+            for selector in selectors:
+                items = soup.select(selector)
+                for item in items:
+                    title_el = (item.select_one('h3, .title, .headline') or
+                               item.select_one('a') or
+                               item)
+
+                    if title_el:
+                        title = title_el.get_text(strip=True)
+                        if title and len(title) > 5:
+                            news_items.append(title[:300])
+
+            if news_items:
+                # Format news
+                news_text = ""
+                current_date = datetime.now().strftime("%d.%m.%Y")
+
+                for i, news_title in enumerate(news_items[:15]):
+                    news_text += f"- {current_date} | {news_title}\n"
+
+                result = f"НОВОСТИ ПО РОССИИ (с официального сайта ЦБ РФ):\n\n{news_text}\n"
+                result += f"Всего новостей: {len(news_items[:15])}\n"
+                result += f"Источник: www.cbr.ru/press/\n"
+                result += f"Обновлено: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+
+                return result
+            else:
+                logger.warning("No news found from CBR alternative source")
+                return None
+
+        except Exception as e:
+            logger.error(f"Error fetching CBR alternative news: {e}")
+            return None
+
+    def _fetch_news_from_newsapi(self, keywords: str) -> Optional[str]:
+        """Fallback method to fetch news from NewsAPI."""
+        cache_key = {"type": "russia_news_fallback", "keywords": keywords}
+        cached_data = self.cache.get(cache_key)
+        if cached_data:
+            logger.info("Using cached NewsAPI fallback data")
             return cached_data
 
         # Try different approaches to get maximum news data
         strategies = [
-            {"name": "recent_5years", "days": 5*365, "page_size": 100},  # Full 5 years (may fail)
-            {"name": "recent_1year", "days": 365, "page_size": 100},      # 1 year (may still fail)
-            {"name": "recent_30days", "days": 30, "page_size": 100},     # 30 days (should work)
-            {"name": "recent_7days", "days": 7, "page_size": 100},       # 7 days (fallback)
+            {"name": "recent_30days", "days": 30, "page_size": 50},     # 30 days (should work)
+            {"name": "recent_7days", "days": 7, "page_size": 50},       # 7 days (fallback)
         ]
 
         news_text = ""
@@ -62,15 +260,11 @@ class DataFetcher:
                     "pageSize": strategy["page_size"]
                 }
 
-                logger.info(f"Trying strategy: {strategy['name']} (from {from_date})")
+                logger.info(f"Trying NewsAPI strategy: {strategy['name']} (from {from_date})")
 
                 response = requests.get(self.news_api_url, params=params, timeout=15)
 
-                # Handle different error codes
-                if response.status_code == 426:
-                    logger.warning(f"NewsAPI upgrade required for {strategy['name']} strategy")
-                    continue
-                elif response.status_code == 429:
+                if response.status_code == 429:
                     logger.warning(f"NewsAPI rate limit exceeded for {strategy['name']}")
                     continue
                 else:
@@ -87,32 +281,24 @@ class DataFetcher:
                             news_text += article_line
                             articles_found += 1
 
-                logger.info(f"Strategy {strategy['name']}: got {len(articles)} articles")
-
-                # If we found articles, continue with next strategy to get more
                 if len(articles) > 0:
-                    continue
+                    break  # Success
 
             except Exception as e:
-                logger.warning(f"Strategy {strategy['name']} failed: {e}")
+                logger.warning(f"NewsAPI strategy {strategy['name']} failed: {e}")
                 continue
 
-        # If no news was found, provide informative message
         if not news_text:
-            news_text = """NewsAPI ограничивает доступ к историческим данным.
-Для получения новостей России за 5 лет нужны:
-• Премиум аккаунт NewsAPI
-• Или альтернативный новостной API (Mediapress, NewsCred и др.)
+            news_text = """Не удалось получить новости через Telegram и NewsAPI.
+Проверьте настройки API ключей."""
 
-Текущая сборка использует доступные данные за последние дни."""
-
-        result = f"НОВОСТИ ПО РОССИИ (все доступные новости за период):\n\n{news_text}\n"
+        result = f"НОВОСТИ ПО РОССИИ (fallback через NewsAPI):\n\n{news_text}\n"
         result += f"Всего получено статей: {articles_found}\n"
-        result += f"Источник: NewsAPI с расширенным поиском\n"
+        result += f"Источник: NewsAPI (fallback)\n"
         result += f"Обновлено: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
 
         self.cache.set(cache_key, result)
-        logger.info(f"Compiled {articles_found} Russia news articles across strategies")
+        logger.info(f"Compiled {articles_found} Russia news articles (fallback)")
 
         return result
 

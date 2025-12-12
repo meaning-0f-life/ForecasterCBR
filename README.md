@@ -7,7 +7,7 @@
 - **FastAPI сервер**: RESTful API для анализа ключевой ставки
 - **Telegram Bot**: Прямое общение с пользователями без классификации intent'ов
 - **Ollama LLM**: Использует локальные LLM модели для интеллектуального анализа на русском
-- **Сбор данных**: Интеграция с новостными API, экономическими данными и научными статьями
+- **Сбор данных**: Интеграция с телеграм каналом @centralbank_russia, экономическими данными и научными статьями
 - **Исторические данные**: Доступ к историческим экономическим показателям и ставкам ЦБ РФ
 - **Прогнозы заседаний**: Предсказание ставки после следующих заседаний ЦБ РФ
 - **Кэширование**: TTL-основанное кэширование для эффективной работы
@@ -54,8 +54,8 @@ cbr-mvp-system/
 3. Configure environment variables:
    - Copy `.env.example` to `.env`: `cp .env.example .env`
    - Edit `.env` file and add your API keys and tokens:
-     - Get News API key from [newsapi.org](https://newsapi.org)
-     - Get Alpha Vantage API key from [alphavantage.co](https://www.alphavantage.co)
+     - Новости теперь берутся из телеграм канала @centralbank_russia (дополнительная настройка не требуется)
+     - Get Alpha Vantage API key from [alphavantage.co](https://www.alphavantage.co) для экономических данных
      - Create Telegram bot and get token from [@BotFather](https://t.me/BotFather)
      - Optionally configure DeepSeek API key
 

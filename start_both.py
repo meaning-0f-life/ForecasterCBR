@@ -38,36 +38,27 @@ async def run_bot():
         raise
 
 async def main():
-    """Main function to run both FastAPI and bot concurrently."""
-    logger.info("Starting CBR Analysis System with FastAPI + Telegram Bot...")
+    """Main function to run bot with polling (simpler approach for Railway)."""
+    logger.info("Starting CBR Analysis Bot with polling...")
 
-    # Initialize bot (only the instance, not polling)
+    # Initialize bot and start polling
     try:
         init_telegram_bot()
         logger.info("Telegram bot initialized successfully")
     except ValueError as e:
-        logger.warning(f"Telegram bot initialization failed: {e}")
-        logger.warning("Running FastAPI server without Telegram bot")
+        logger.error(f"Fatal error: {e}")
+        logger.error("Cannot start bot without proper TELEGRAM_BOT_TOKEN")
+        raise
     except Exception as e:
-        logger.error(f"Unexpected error initializing Telegram bot: {e}")
-        logger.error("Running FastAPI server only")
-        # Run FastAPI only
-        await run_fastapi()
-        return
+        logger.error(f"Error initializing bot: {e}")
+        raise
 
-    # Run both FastAPI and bot concurrently
+    # Start polling - this will keep Railway alive due to continuous activity
     try:
-        logger.info("Starting both FastAPI server and Telegram bot polling...")
-        await asyncio.gather(
-            run_fastapi(),
-            run_bot(),
-            return_exceptions=True
-        )
+        await start_telegram_bot()
     except Exception as e:
-        logger.error(f"Error running both services: {e}")
-    finally:
-        logger.info("Stopping services...")
-        await stop_telegram_bot()
+        logger.error(f"Error starting bot polling: {e}")
+        raise
 
 if __name__ == "__main__":
     # Handle graceful shutdown

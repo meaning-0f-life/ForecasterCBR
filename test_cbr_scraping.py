@@ -11,7 +11,9 @@ def test_data_fetching():
     fetcher = DataFetcher(
         news_api_key=os.getenv("NEWS_API_KEY", ""),
         economic_api_key=os.getenv("ECONOMIC_DATA_API_KEY", ""),
-        cache=cache
+        cache=cache,
+        telegram_api_id=int(os.getenv("TELEGRAM_API_ID", 0)) if os.getenv("TELEGRAM_API_ID") else None,
+        telegram_api_hash=os.getenv("TELEGRAM_API_HASH", "")
     )
 
     print("=== ТЕСТИРОВАНИЕ ЗАГРУЗКИ ЭКОНОМИЧЕСКИХ ДАННЫХ ===")

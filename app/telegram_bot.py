@@ -32,14 +32,36 @@ class TelegramAnalyzerBot:
         # Initialize components
         self.context_manager = get_context_manager()  # System context manager
         self.analyzer = LLMAnalyzer(
-            model=os.getenv("OLLAMA_MODEL"),
-            host=os.getenv("OLLAMA_HOST")
+            model=os.getenv("OPENROUTER_MODEL", "mistralai/mistral-7b-instruct:free"),
+            host=None  # For OpenRouter, no local host needed
         )
 
-        # Register handlers
+        # Register handlers (only for polling mode - no webhooks)
         self.dp.message.register(self.handle_start_command, Command(commands=["start"]))
         self.dp.message.register(self.handle_help_command, Command(commands=["help"]))
         self.dp.message.register(self.handle_text_message)  # Fallback for other messages
+
+    def setup_webhook(self):
+        """Set up webhook for production deployment."""
+        if not self.production_webhook_url:
+            return
+
+        import requests
+        webhook_url = f"{self.production_webhook_url}/telegram-webhook"
+        telegram_api_url = f"https://api.telegram.org/bot{self.bot_token}/setWebhook"
+
+        try:
+            response = requests.post(telegram_api_url, data={"url": webhook_url})
+            if response.status_code == 200:
+                data = response.json()
+                if data.get("ok"):
+                    logger.info(f"Webhook set successfully to: {webhook_url}")
+                else:
+                    logger.error(f"Failed to set webhook: {data.get('description')}")
+            else:
+                logger.error(f"HTTP error setting webhook: {response.status_code}")
+        except Exception as e:
+            logger.error(f"Error setting webhook: {e}")
 
     async def handle_start_command(self, message: types.Message):
         """Handle /start command."""

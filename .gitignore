@@ -44,6 +44,8 @@ coverage.xml
 env/
 venv/
 ENV/
+app/data/telegram_user_session.session
+app/data/cache
 
 # IDE
 .vscode/
@@ -58,9 +60,21 @@ Thumbs.db
 # Articles (may contain sensitive data)
 articles/sample_*.txt
 
+# Cache data
+app/data/cache/
+app/data/telegram_user_session.session
+
 # Logs
 *.log
 logs/
 
 # Prompts (debug feature)
 prompts/
+
+setup_yc.sh
+
+setup_railway.sh
+
+setup_render.sh
+
+setup_google_cloud.sh

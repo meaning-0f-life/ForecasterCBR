@@ -9,4 +9,4 @@ COPY . .
 
 EXPOSE 8000
 
-CMD ["python", "-m", "app.main"]
+CMD ["python", "start_both.py"]
