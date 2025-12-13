@@ -57,7 +57,7 @@ cbr-mvp-system/
      - Новости теперь берутся из телеграм канала @centralbank_russia (дополнительная настройка не требуется)
      - Get Alpha Vantage API key from [alphavantage.co](https://www.alphavantage.co) для экономических данных
      - Create Telegram bot and get token from [@BotFather](https://t.me/BotFather)
-     - Optionally configure DeepSeek API key
+     - Optionally configure DeepSeek API key or OpenRouter for larger context models
 
 4. Ensure Ollama is running locally with the specified model:
    ```bash
@@ -155,9 +155,10 @@ DEEPSEEK_MODEL=deepseek-chat
 
 - **Эффективная архитектура**: Системный контекст обновляется автоматически каждые CACHE_TTL секунд (настройка в .env)
 - **Быстрые ответы**: Бот использует предзагруженный контекст, а не получает данные каждый раз
+- **Автоматическая загрузка новостей**: Данные из Telegram-канала @centralbank_russia загружаются автоматически в фоне каждые CACHE_TTL секунд
 - **Любые вопросы**: Нет классификации intent'ов - отвечаем на любые вопросы о ЦБ РФ, экономике, ставках
 - **Полный анализ**: Ответы основаны на: новостях, заседаниях ЦБ, истории ставок, инфляции, ВВП
-- **Автоматические обновления**: Контекст обновляется в фоне каждые 3600 секунд (по умолчанию)
+- **Автоматические обновления**: Контекст и новости обновляются в фоне каждые 3600 секунд (по умолчанию)
 - **Поддержка команд**: /start и /help для помощи пользователям
 
 ## Environment Variables

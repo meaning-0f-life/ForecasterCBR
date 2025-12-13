@@ -96,6 +96,8 @@ class DataFetcher:
 
                     # Calculate date range: last 2 months
                     two_months_ago = datetime.now() - timedelta(days=60)
+                    one_and_a_half_month_ago = datetime.now() - timedelta(days=45)
+                    one_month_ago = datetime.now() - timedelta(days=30)
 
                     # Get the channel entity
                     channel = await client.get_entity("centralbank_russia")
@@ -103,11 +105,11 @@ class DataFetcher:
                     # Get messages from the channel starting from 2 months ago
                     messages = []
                     count = 0
-                    async for message in client.iter_messages(channel, offset_date=two_months_ago, reverse=True):
-                        if message.text and len(message.text.strip()) > 0 and count < 30:
+                    async for message in client.iter_messages(channel, offset_date=one_and_a_half_month_ago, reverse=True):
+                        if message.text and len(message.text.strip()) > 0 and count < 1000:
                             messages.append(message)
                             count += 1
-                        if count >= 30:
+                        if count >= 1000:
                             break
 
                     logger.info(f"Retrieved {len(messages)} messages from CBR Telegram channel")
@@ -121,15 +123,13 @@ class DataFetcher:
                     if 'client' in locals():
                         await client.disconnect()
 
-            # Check if we're in an existing event loop
+            # Try to run the async function; if event loop running, skip
             try:
-                asyncio.get_running_loop()
+                logger.info("No running event loop, using Telegram API")
+                messages = asyncio.run(fetch_messages())
+            except RuntimeError:
                 logger.info("Already in event loop, skipping Telegram API (use NewsAPI instead)")
                 return None  # Will fallback to NewsAPI
-            except RuntimeError:
-                # No running loop, we can use run()
-                logger.info("No running event loop, can use Telegram API")
-                messages = asyncio.run(fetch_messages())
 
             if not messages:
                 logger.warning("No messages retrieved from Telegram")
@@ -137,10 +137,10 @@ class DataFetcher:
 
             # Process and format messages
             news_text = ""
-            for msg in messages[:30]:  # Limit to 30 most recent messages
+            for msg in messages:  # Limit to 400 most recent messages
                 # Extract date and clean text
                 msg_date = msg.date.strftime("%d.%m.%Y %H:%M")
-                clean_text = msg.text.strip()[:500]  # Limit text length
+                clean_text = msg.text.strip()[:9000]  # Limit text length to 9000 characters
                 # Replace newlines with spaces for better formatting
                 clean_text = clean_text.replace('\n', ' ').replace('\r', ' ')
                 # Remove extra spaces
@@ -154,13 +154,13 @@ class DataFetcher:
                 return None
 
             result = f"НОВОСТИ ПО РОССИИ (из Telegram канала ЦБ РФ @centralbank_russia):\n\n{news_text}\n"
-            result += f"Всего получено постов: {len(messages[:30])}\n"
+            result += f"Всего получено постов: {len(messages)}\n"
             result += f"Источник: Telegram канал @centralbank_russia\n"
             result += f"Период: последние 2 месяца\n"
             result += f"Обновлено: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
 
             self.cache.set(cache_key, result)
-            logger.info(f"Successfully processed {len(messages[:30])} CB RF Telegram posts")
+            logger.info(f"Successfully processed {len(messages)} CB RF Telegram posts")
 
             return result
 

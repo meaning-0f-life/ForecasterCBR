@@ -7,6 +7,8 @@ import os
 from dotenv import load_dotenv
 from app.llm.analyzer import LLMAnalyzer
 from app.context_manager import get_context_manager
+from app.data.fetcher import DataFetcher
+from app.data.cache import DataCache
 from app.utils.logger import setup_logger
 
 load_dotenv()
@@ -40,6 +42,9 @@ class TelegramAnalyzerBot:
         self.dp.message.register(self.handle_start_command, Command(commands=["start"]))
         self.dp.message.register(self.handle_help_command, Command(commands=["help"]))
         self.dp.message.register(self.handle_text_message)  # Fallback for other messages
+
+        # Start background task for Telegram data updates
+        self._telegram_update_task = None
 
     def setup_webhook(self):
         """Set up webhook for production deployment."""
@@ -134,9 +139,44 @@ class TelegramAnalyzerBot:
             except:
                 pass  # Message might be already deleted
 
+    async def _update_telegram_data_background(self):
+        """Background task to update Telegram data every CACHE_TTL seconds."""
+        update_interval = int(os.getenv("CACHE_TTL", 3600))  # Default 1 hour
+        while True:
+            try:
+                logger.info("Starting scheduled Telegram data update...")
+                # Force update of Telegram data
+                cache = DataCache(ttl=update_interval)
+                fetcher = DataFetcher(
+                    news_api_key=os.getenv("NEWS_API_KEY", ""),
+                    economic_api_key=os.getenv("ECONOMIC_DATA_API_KEY", ""),
+                    cache=cache,
+                    telegram_api_id=int(os.getenv("TELEGRAM_API_ID", 0)) if os.getenv("TELEGRAM_API_ID") else None,
+                    telegram_api_hash=os.getenv("TELEGRAM_API_HASH", "")
+                )
+
+                # Preload Telegram data (similar to preload_telegram_data.py)
+                result = fetcher._fetch_news_from_telegram()
+                if result and "centralbank_russia" in result:
+                    logger.info("Scheduled Telegram data update successful")
+                else:
+                    logger.warning("Scheduled Telegram data update failed")
+
+            except Exception as e:
+                logger.error(f"Error in background Telegram update: {e}")
+
+            # Wait for next update
+            await asyncio.sleep(update_interval)
+
     async def start_polling(self):
         """Start the bot with polling."""
         logger.info("Starting Telegram bot polling...")
+
+        # Start background task for Telegram updates
+        if not self._telegram_update_task:
+            self._telegram_update_task = asyncio.create_task(self._update_telegram_data_background())
+            logger.info("Started background Telegram update task")
+
         try:
             await self.dp.start_polling(self.bot)
         except Exception as e:
@@ -145,6 +185,14 @@ class TelegramAnalyzerBot:
 
     async def stop(self):
         """Stop the bot."""
+        if self._telegram_update_task and not self._telegram_update_task.done():
+            self._telegram_update_task.cancel()
+            try:
+                await self._telegram_update_task
+            except asyncio.CancelledError:
+                pass
+            logger.info("Telegram background update task cancelled")
+
         await self.bot.session.close()
         logger.info("Telegram bot stopped")
 
