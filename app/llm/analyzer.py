@@ -230,12 +230,12 @@ class LLMAnalyzer:
             return None
 
     def _save_prompt_if_enabled(self, prompt: str, prompt_type: str = "unknown"):
-        """Save prompt to file if SAVE_PROMPTS environment variable is set."""
+        """Save prompt to file if SAVE_PROMPTS environment variable is set to 'true'."""
         import os
         from datetime import datetime
 
         save_prompts = os.getenv("SAVE_PROMPTS")
-        if not save_prompts:
+        if not save_prompts or save_prompts.lower() != 'true':
             return
 
         try:

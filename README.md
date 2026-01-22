@@ -26,7 +26,6 @@ cbr-mvp-system/
 ├── app/
 │ ├── __init__.py
 │ ├── main.py ← FastAPI server
-│ ├── webhook.py ← Legacy Dialogflow webhook (deprecated)
 │ ├── telegram_bot.py ← Telegram bot handler
 │ ├── data/
 │ │ ├── __init__.py
@@ -39,8 +38,8 @@ cbr-mvp-system/
 │ └── utils/
 │ ├── __init__.py
 │ └── logger.py ← Logging utility
-└── tests/
- └── test_webhook.py
+└── articles/
+  └── README.md ← Instructions for adding scientific articles
 ```
 
 ## Installation
@@ -164,22 +163,6 @@ DEEPSEEK_MODEL=deepseek-chat
 ## Environment Variables
 
 See `.env` file for required configuration.
-
-## Testing
-
-Run pytest tests:
-```bash
-python -m pytest tests/
-```
-
-### CBR Data Scraping Test
-
-Test the CBR.ru key rate parsing functionality:
-```bash
-python test_cbr_scraping.py
-```
-
-This will analyze the CBR website structure and provide recommendations for implementing real-time data parsing.
 
 ## License
 

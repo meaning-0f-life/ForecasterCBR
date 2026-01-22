@@ -1,7 +1,5 @@
-from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel
+from fastapi import FastAPI
 from app.utils.logger import setup_logger
-from app.webhook import router
 import os
 from dotenv import load_dotenv
 
@@ -9,7 +7,6 @@ load_dotenv()
 logger = setup_logger(__name__)
 
 app = FastAPI(title="CBR Key Rate Analysis MVP")
-app.include_router(router)
 
 
 

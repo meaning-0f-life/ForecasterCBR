@@ -49,9 +49,33 @@ class DataCache:
 
         return None
 
+    def _clear_expired_files(self) -> None:
+        """Remove expired cache files from disk."""
+        try:
+            for filename in os.listdir(self.cache_dir):
+                if filename.endswith('.json'):
+                    cache_file = os.path.join(self.cache_dir, filename)
+                    try:
+                        with open(cache_file, 'r', encoding='utf-8') as f:
+                            data = json.load(f)
+                        timestamp = data.get('timestamp', 0)
+                        if time.time() - timestamp > self.cache.ttl:
+                            os.remove(cache_file)
+                    except (json.JSONDecodeError, KeyError, OSError):
+                        # Remove invalid files
+                        try:
+                            os.remove(cache_file)
+                        except OSError:
+                            pass
+        except OSError:
+            pass  # Ignore directory access errors
+
     def set(self, key_data: dict, value: Any) -> None:
         """Store data in cache with file persistence."""
         key = self._get_key(key_data)
+
+        # Clear expired files before storing new one
+        self._clear_expired_files()
 
         # Store in memory cache
         self.cache[key] = value
@@ -65,6 +89,14 @@ class DataCache:
             }
             with open(cache_file, 'w', encoding='utf-8') as f:
                 json.dump(cache_data, f, ensure_ascii=False)
+
+            # Remove all other cache files to keep only the latest
+            for filename in os.listdir(self.cache_dir):
+                if filename.endswith('.json') and filename != f"{key}.json":
+                    try:
+                        os.remove(os.path.join(self.cache_dir, filename))
+                    except OSError:
+                        pass
         except OSError as e:
             print(f"Warning: Could not save cache to file {cache_file}: {e}")
 
