@@ -6,7 +6,7 @@
 
 - **FastAPI сервер**: RESTful API для анализа ключевой ставки
 - **Telegram Bot**: Прямое общение с пользователями без классификации intent'ов
-- **Ollama LLM**: Использует локальные LLM модели для интеллектуального анализа на русском
+- **Ollama LLM**: Использует локальные LLM модели для интеллектуального анализа на русском (так же реализована возможность использовать API DeepSeek или моделей из OpenRouter)
 - **Сбор данных**: Интеграция с телеграм каналом @centralbank_russia, экономическими данными и научными статьями
 - **Исторические данные**: Доступ к историческим экономическим показателям и ставкам ЦБ РФ
 - **Прогнозы заседаний**: Предсказание ставки после следующих заседаний ЦБ РФ
@@ -33,7 +33,7 @@ cbr-mvp-system/
 │ │ └── cache.py ← Data caching
 │ ├── llm/
 │ │ ├── __init__.py
-│ │ ├── analyzer.py ← Ollama queries
+│ │ ├── analyzer.py ← LLM queries
 │ │ └── prompts.py ← Prompt templates
 │ └── utils/
 │ ├── __init__.py
@@ -167,3 +167,16 @@ See `.env` file for required configuration.
 ## License
 
 This is an MVP implementation. Use at your own risk.
+
+## OpenRouter models Support
+
+Система теперь поддерживает облачные модели OpenRouter!
+
+### Настройка OpenRouter:
+   ```bash
+   # Set USE_OPENROUTER=true for free cloud LLM (OpenRouter aggregates multiple providers)
+   USE_OPENROUTER="true"
+   OPENROUTER_API_KEY='YOUR_API_HEREg'
+   OPENROUTER_BASE_URL="https://openrouter.ai/api/v1"
+   OPENROUTER_MODEL="openai/gpt-oss-120b"  # Free models available!
+   ```
